@@ -75,10 +75,6 @@ else:
         INFO     = FOREGROUND_GREEN
         DEBUG    = FOREGROUND_CYAN
 
-        def __init__(self, streamHandler):
-            super(ColorStreamHandler, self).__init__(streamHandler.stream)
-            self.downstreamHandler = streamHandler
-
         @classmethod
         def _get_color(cls, level):
             if level >= logging.CRITICAL:  return cls.CRITICAL
@@ -92,8 +88,9 @@ else:
             import ctypes
             ctypes.windll.kernel32.SetConsoleTextAttribute(self._outhdl, code)
 
-        def __init__(self, stream=None):
-            super(ColorStreamHandler, self).__init__(self, stream)
+        def __init__(self, streamHandler):
+            super(ColorStreamHandler, self).__init__(streamHandler.stream)
+            self.downstreamHandler = streamHandler
             # get file handle for the stream
             import ctypes, ctypes.util
             # for some reason find_msvcrt() sometimes doesn't find msvcrt.dll on my system?
@@ -101,12 +98,12 @@ else:
             if not crtname:
                 crtname = ctypes.util.find_library("msvcrt")
             crtlib = ctypes.cdll.LoadLibrary(crtname)
-            self._outhdl = crtlib._get_osfhandle(self.self.downstreamHandler.stream.fileno())
+            self._outhdl = crtlib._get_osfhandle(self.downstreamHandler.stream.fileno())
 
         def emit(self, record):
             color = self._get_color(record.levelno)
             self._set_color(color)
-            self.downstreamHandler.emit(self, record)
+            self.downstreamHandler.emit(record)
             self._set_color(self.FOREGROUND_WHITE)
 
 
