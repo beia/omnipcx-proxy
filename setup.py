@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from distutils.core import setup
+import py2exe
 
 setup(name='omnipcx',
     version='1.0',
@@ -9,7 +10,7 @@ setup(name='omnipcx',
     url='https://github.com/vladwing/omnipcx',
     packages=['omnipcx', 'omnipcx.messages'],
     entry_points = {
-        'console_scripts': ['omnipcx=omnipcx:main'],
+        'console_scripts': ['proxy=omnipcx:main'],
     },
     classifiers=[
         'Development Status :: 4 - Beta',
