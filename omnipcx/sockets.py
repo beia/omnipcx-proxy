@@ -11,7 +11,7 @@ class Server(Loggable):
         self.cdr_port = config['cdr_port']
         self.old_address = config['old_address']
         self.cdr_address = config['cdr_address']
-        self.timeout = 5.0
+        self.timeout = 20.0
         self.retries = config['retries']
         self.retry_sleep = config['retry_sleep']
 
@@ -41,17 +41,17 @@ class Server(Loggable):
             return None
 
     def socket_tuples(self):
-        for skt_old, address in self.listen():
-            skt_old.settimeout(self.timeout)
+        for skt_opera, address in self.listen():
+            skt_opera.settimeout(self.timeout)
             retries = self.retries
             skt_cdr = None
-            skt_opera = None
+            skt_old = None
             while retries > 0:
                 if skt_cdr is None:
                     skt_cdr = self.connect(self.cdr_address, self.cdr_port)
-                if skt_opera is None:
-                    skt_opera = self.connect(self.old_address, self.old_port)
-                if skt_opera is None or skt_cdr is None:
+                if skt_old is None:
+                    skt_old = self.connect(self.old_address, self.old_port)
+                if skt_old is None or skt_cdr is None:
                     retries -= 1
                     self.logger.warn("Couldn't open connection. Waiting ...")
                     time.sleep(self.retry_sleep)

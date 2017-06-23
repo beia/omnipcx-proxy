@@ -40,13 +40,13 @@ class Application(Loggable):
         parser = argparse.ArgumentParser(prog="proxy", description='Proxy between OLD and Opera')
         parser.add_argument("--log-level", type=Application.log_levels, default="INFO",
             help="Log level", dest="log_level")
-        parser.add_argument('--old-port', dest='old_port', default=DEFAULT_OLD_PORT,
+        parser.add_argument('--old-port', type=int, dest='old_port', default=DEFAULT_OLD_PORT,
             help='Office Link Driver port (connect)')
         parser.add_argument('--old-address', dest='old_address', required=True,
             help='Office Link Driver address (connect)')
-        parser.add_argument('--opera-port', dest='opera_port', default=DEFAULT_OPERA_PORT,
+        parser.add_argument('--opera-port', type=int, dest='opera_port', default=DEFAULT_OPERA_PORT,
             help='Opera port (listen)')
-        parser.add_argument('--cdr-port', dest='cdr_port', default=DEFAULT_CDR_PORT,
+        parser.add_argument('--cdr-port', type=int, dest='cdr_port', default=DEFAULT_CDR_PORT,
             help='CDR collection port (connect)')
         parser.add_argument('--cdr-address', dest='cdr_address', required=True,
             help='CDR collection address (connect)')
@@ -68,7 +68,7 @@ class Application(Loggable):
                 'retry_sleep': DEFAULT_RETRY_TIMEOUT,
             })
 
-    def init_logging(self, level=logging.INFO):
+    def init_logging(self, level=logging.DEBUG):
         logging.basicConfig(level=level)
         formatter = logging.Formatter(fmt=DEFAULT_FORMAT)
         streamHandler = logging.StreamHandler(sys.stderr)
@@ -92,3 +92,4 @@ class Application(Loggable):
             proxy.start()
             for skt in [skt_opera, skt_old, skt_cdr]:
                 skt.close()
+            self.detector.reset()

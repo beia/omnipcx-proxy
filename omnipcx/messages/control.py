@@ -3,24 +3,24 @@ from omnipcx.messages.base import ControlMessage
 class ACK(ControlMessage):
     @classmethod
     def get_type(cls):
-        return '\x06'
+        return b'\x06'
 
 
 class NAK(ControlMessage):
     @classmethod
     def get_type(cls):
-        return '\x15'
+        return b'\x15'
 
 
 class XON(ControlMessage):
     @classmethod
     def get_type(cls):
-        return '\x13'
+        return b'\x13'
 
 
 class XOFF(ControlMessage):
     @classmethod
     def get_type(cls):
-        return '\x11'
+        return b'\x11'
 
 CLASSES = [ACK, NAK, XON, XOFF]

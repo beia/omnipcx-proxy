@@ -129,7 +129,7 @@ class LogWrapper(object):
             del frame
 
     def trace(self, message, *args):
-        self._logger.trace(message, *args, extra=self._logging_extra)
+        self._logger.debug(message, *args, extra=self._logging_extra)
 
     def debug(self, message, *args):
         self._logger.debug(message, *args, extra=self._logging_extra)

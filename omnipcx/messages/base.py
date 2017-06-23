@@ -41,7 +41,7 @@ class ProtocolMessage(MessageBase):
 
     @classmethod
     def get_payload_size(cls):
-        size = cls.get_size() - 3
+        size = cls.get_size() - 1
         if cls.has_crc():
             size -= 2
         return size
@@ -50,10 +50,10 @@ class ProtocolMessage(MessageBase):
         assert len(payload) == self.get_payload_size()
         self.payload = payload
 
-    @staticmethod
-    def crc(string):
+    @classmethod
+    def crc(cls, string):
         hexa = "0123456789ABCDEF"
-        result = ord(self.get_type())
+        result = ord(cls.get_type())
         for c in string:
             result = result ^ ord(c)
         return hexa[(result >> 4) & 0xF] + hexa[result & 0xF]
