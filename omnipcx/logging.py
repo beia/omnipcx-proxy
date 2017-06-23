@@ -121,7 +121,7 @@ class LogWrapper(object):
                     'file': str(frame_info[1]),
                     'line_no': str(frame_info[2]),
                     'function': frame_info[3],
-                    'timestamp': time.time(),
+                    'timestamp': int(time.time()),
                 }
             finally:
                 del frame_info

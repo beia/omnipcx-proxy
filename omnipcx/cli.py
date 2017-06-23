@@ -1,8 +1,9 @@
 import argparse
 import logging
 import sys
+import traceback
 from omnipcx.messages import MessageDetector, MessageBase
-from omnipcx.proxy import Proxy, Pipeline
+from omnipcx.proxy import Proxy
 from omnipcx.logging import ColorStreamHandler, Loggable, LogWrapper
 from omnipcx.sockets import Server
 
@@ -56,7 +57,6 @@ class Application(Loggable):
 
     def __init__(self):
         self.args = Application.parse_args()
-        self.detector = MessageDetector()
         self.init_logging()
         self.server = Server({
                 'opera_port': self.args.opera_port,
@@ -79,7 +79,7 @@ class Application(Loggable):
         lgr.setLevel(level)
         lgr.propagate = False
         logger = LogWrapper(lgr)
-        for cls in [Server, MessageDetector, Proxy, MessageBase, Application, Pipeline]:
+        for cls in [Server, MessageDetector, Proxy, MessageBase, Application]:
             cls.set_logger(logger)
         self.logger.info("Initialized logging")
 
@@ -88,8 +88,9 @@ class Application(Loggable):
         self.logger.info("Starting application")
         for skt_old, skt_opera, skt_cdr in self.server.socket_tuples():
             self.logger.info("Received Opera connection. Starting proxy operation")
-            proxy = Proxy(skt_old, skt_opera, skt_cdr, self.detector, self.args.default_password)
-            proxy.start()
-            for skt in [skt_opera, skt_old, skt_cdr]:
-                skt.close()
-            self.detector.reset()
+            proxy = Proxy(skt_old, skt_opera, skt_cdr, self.args.default_password)
+            try:
+                proxy.run()
+            finally:
+                for skt in [skt_opera, skt_old, skt_cdr]:
+                    skt.close()

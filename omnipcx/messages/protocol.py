@@ -14,10 +14,12 @@ class KeepAlive(ProtocolMessage):
 @MessageParameters('J', 74)
 class SMDR(ProtocolMessage):
     def serialize_cdr(self):
-        return self.payload + '\x0d\x0a'
+        return self.payload + b'\x0d\x0a'
 
 
 class CheckInBase(ProtocolMessage):
+    PASSWORD_OFFSET = 35 # TODO: check with PBX
+
     @property
     def password(self):
         return self.payload[self.PASSWORD_OFFSET:self.PASSWORD_OFFSET + self.PASSWORD_LEN]
@@ -26,13 +28,13 @@ class CheckInBase(ProtocolMessage):
     def password(self, value):
         if len(value) > self.PASSWORD_LEN:
             raise ValueError("'password' needs to be less than %d characters long" % self.PASSWORD_LEN)
-        password = " " * (self.PASSWORD_LEN - len(value)) + value
-        self.payload = self.payload[:self.PASSWORD_OFFSET] + password + self.payload[self.PASSWORD_OFFSET + self.PASSWORD_LEN:]
+        password = bytearray(" " * (self.PASSWORD_LEN - len(value)) + value, "ascii")
+        new_payload = self.payload[:self.PASSWORD_OFFSET] + password + self.payload[self.PASSWORD_OFFSET + self.PASSWORD_LEN:-2]
+        self.payload = new_payload + bytearray(self.crc(new_payload), "ascii")
 
 
 @MessageParameters('A', 61)
 class CheckIn(CheckInBase):
-    PASSWORD_OFFSET = 34
     PASSWORD_LEN = 4
 
 
@@ -97,7 +99,6 @@ class ReinitRequest(ProtocolMessage):
 
 @MessageParameters('B', 63)
 class CheckinSixDigit(CheckInBase):
-    PASSWORD_OFFSET = 34
     PASSWORD_LEN = 6
 
 
@@ -144,9 +145,3 @@ PartialReinitSixDigit,
 ReplySixDigit
 ]
 
-"""[CheckOut, CheckinSixDigit, FullReinit, FullReinitSixDigit,
-    GuestTelephoneAccount, Interogation, KeepAlive, MessageParameters, ModificationSixDigit,
-    PartialReinit, PartialReinitSixDigit, PhoneAllocation, ReinitRequest,
-    Reply, ReplySixDigit, RoomStatusChange, SMDR, TCPConnection, VoiceMailAttribution,
-    WakeUpEvent]
-"""

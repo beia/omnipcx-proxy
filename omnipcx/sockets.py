@@ -11,7 +11,7 @@ class Server(Loggable):
         self.cdr_port = config['cdr_port']
         self.old_address = config['old_address']
         self.cdr_address = config['cdr_address']
-        self.timeout = 20.0
+        self.timeout = 0.5
         self.retries = config['retries']
         self.retry_sleep = config['retry_sleep']
 
@@ -58,15 +58,15 @@ class Server(Loggable):
                     continue
                 else:
                     retries = 0
-            if skt_opera is None or skt_cdr is None:
-                if skt_opera:
+            if skt_old is None or skt_cdr is None:
+                if skt_old:
                     self.logger.info("Closing connection to Opera")
-                    skt_opera.close()
+                    skt_old.close()
                 if skt_cdr:
                     self.logger.info("Closing connection to CDR collector")
                     skt_cdr.close()
                 self.logger.error("Couldn't connect to OLD or CDR collector. Giving up.")
-                skt_old.close()
+                skt_opera.close()
                 continue
             yield skt_old, skt_opera, skt_cdr
 

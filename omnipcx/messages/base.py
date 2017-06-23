@@ -36,27 +36,21 @@ class ControlMessage(MessageBase):
 
 
 class ProtocolMessage(MessageBase):
-    STX = "\x02"
-    ETX = "\x03"
-
-    @classmethod
-    def get_payload_size(cls):
-        size = cls.get_size() - 1
-        if cls.has_crc():
-            size -= 2
-        return size
+    STX = b'\x02'
+    ETX = b'\x03'
 
     def __init__(self, payload):
-        assert len(payload) == self.get_payload_size()
-        self.payload = payload
+        # Not valid anymore
+        # assert len(payload) == self.get_payload_size()
+        self.payload = payload[1:-1]
 
     @classmethod
     def crc(cls, string):
-        hexa = "0123456789ABCDEF"
+        hexa = '0123456789ABCDEF'
         result = ord(cls.get_type())
         for c in string:
-            result = result ^ ord(c)
+            result = result ^ c
         return hexa[(result >> 4) & 0xF] + hexa[result & 0xF]
 
     def serialize(self):
-        return ProtocolMessage.STX + self.payload + ProtocolMessage.crc(self.payload) + ProtocolMessage.ETX
+        return ProtocolMessage.STX + self.payload + ProtocolMessage.ETX
