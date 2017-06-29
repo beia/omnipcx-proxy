@@ -47,8 +47,10 @@ class ProtocolMessage(MessageBase):
     @classmethod
     def crc(cls, string):
         hexa = '0123456789ABCDEF'
-        result = ord(cls.get_type())
-        for c in string:
+        if string == b"":
+            return b""
+        result = string[0]
+        for c in string[1:]:
             result = result ^ c
         return hexa[(result >> 4) & 0xF] + hexa[result & 0xF]
 
