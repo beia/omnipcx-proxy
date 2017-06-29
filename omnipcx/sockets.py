@@ -21,7 +21,7 @@ class Server(Loggable):
         self.logger.info("Listening on [%s]:%d ...", address, self.opera_port)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((address, self.opera_port))
-        server.listen(1)
+        server.listen(10)
         while True:
             self.logger.info("Waiting for client connection ...")
             try:
@@ -37,7 +37,7 @@ class Server(Loggable):
             self.logger.info("Trying to open a connection to %s:%s" %(address, port))
             skt.connect((address, port),)
             return skt
-        except ConnectionRefusedError:
+        except (socket.timeout, ConnectionRefusedError) as e:
             return None
 
     def socket_tuples(self):
@@ -53,19 +53,20 @@ class Server(Loggable):
                     skt_old = self.connect(self.old_address, self.old_port)
                 if skt_old is None or skt_cdr is None:
                     retries -= 1
-                    self.logger.warn("Couldn't open connection. Waiting ...")
+                    self.logger.warn("Couldn't open connection to " + "CDR" if skt_cdr is None else "OLD" + ". Waiting ...")
                     time.sleep(self.retry_sleep)
                     continue
                 else:
                     retries = 0
             if skt_old is None or skt_cdr is None:
                 if skt_old:
-                    self.logger.info("Closing connection to Opera")
+                    self.logger.trace("Closing connection to Opera")
+                    self.logger.error("Couldn't connect to CDR collector. Giving up.")
                     skt_old.close()
                 if skt_cdr:
-                    self.logger.info("Closing connection to CDR collector")
+                    self.logger.trace("Closing connection to CDR collector")
+                    self.logger.error("Couldn't connect to OLD. Giving up.")
                     skt_cdr.close()
-                self.logger.error("Couldn't connect to OLD or CDR collector. Giving up.")
                 skt_opera.close()
                 continue
             yield skt_old, skt_opera, skt_cdr
