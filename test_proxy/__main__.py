@@ -17,7 +17,7 @@ def dumb_ack():
     server.listen(1)
     while True:
         sock, addr = server.accept()
-        sock.settimeout(5.0)
+        sock.settimeout(5000)
         while True:
             sock.send(b'\x02@FFFF\x03')
             msg = sock.recv(RECV_SIZE)
@@ -29,7 +29,6 @@ def dumb_ack():
             print("Message received %s" % msg)
             sock.send(b'\x06')
             print("Sent ACK")
-
 
 
 def simple_client():
@@ -50,7 +49,11 @@ def simple_client():
         msg = sock.recv(RECV_SIZE)
         print("Message received %s" % msg)
 
+
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Missing integer parameter. Please check source code")
+        sys.exit(0)
     if int(sys.argv[1]) == 1:
         dumb_ack()
     elif int(sys.argv[1]) == 2:
