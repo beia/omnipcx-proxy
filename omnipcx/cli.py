@@ -51,6 +51,7 @@ class Application(Loggable):
             help='CDR collection port (connect)')
         parser.add_argument('--cdr-address', dest='cdr_address', required=True,
             help='CDR collection address (connect)')
+        parser.add_argument('--ipv6', type=bool, dest='ipv6', help='Use IPv6')
         parser.add_argument('--default-password', dest='default_password', default=DEFAULT_PASSWORD,
             help='Default voice mail password')
         return parser.parse_args()
@@ -59,6 +60,7 @@ class Application(Loggable):
         self.args = Application.parse_args()
         self.init_logging()
         self.server = Server({
+                'ipv6': self.args.ipv6,
                 'opera_port': self.args.opera_port,
                 'old_port': self.args.old_port,
                 'old_address': self.args.old_address,

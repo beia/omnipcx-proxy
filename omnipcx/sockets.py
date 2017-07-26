@@ -6,6 +6,7 @@ from omnipcx.logging import Loggable
 class Server(Loggable):
     def __init__(self, config):
         super(Server, self).__init__()
+        self.ipv6 = config['ipv6'] if socket.AF_INET6 else socket.AF_INET
         self.opera_port = config['opera_port']
         self.old_port = config['old_port']
         self.cdr_port = config['cdr_port']
@@ -16,8 +17,8 @@ class Server(Loggable):
         self.retry_sleep = config['retry_sleep']
 
     def listen(self):
-        server = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        address = "::" # socket.gethostname()
+        server = socket.socket(self.ipv6, socket.SOCK_STREAM)
+        address = "" # socket.gethostname()
         self.logger.info("Listening on [%s]:%d ...", address, self.opera_port)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((address, self.opera_port))
