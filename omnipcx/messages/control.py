@@ -6,7 +6,7 @@ class ACK(ControlMessage):
         return b'\x06'
 
 
-class NAK(ControlMessage):
+class NACK(ControlMessage):
     @classmethod
     def get_type(cls):
         return b'\x15'
@@ -23,4 +23,4 @@ class XOFF(ControlMessage):
     def get_type(cls):
         return b'\x11'
 
-CLASSES = [ACK, NAK, XON, XOFF]
+CLASSES = [ACK, NACK, XON, XOFF]
