@@ -3,6 +3,7 @@ import time
 from omnipcx.logging import Loggable
 from omnipcx.messages import MessageDetector
 from omnipcx.messages.protocol import SMDR, CheckInBase
+from omnipcx.messages.control import NACK
 
 MAX_TIME = 60.0
 
@@ -36,14 +37,24 @@ class Proxy(Loggable):
                     except ConnectionResetError:
                         cdr_send_success = False
                 if not cdr_send_success:
-                    # TODO: maybe send a NACK to PBX here?
+                    try:
+                        self.pbx.send(NACK().serialize())
+                        self.logger.error("Sent NACK to PBX to force the CDR to be resent")
+                    except:
+                        self.logger.error("Failed sending NACK to PBX")
+                        pass
                     self.logger.error("CDR collector closed connection. Reseting all others")
                     return
                 self.logger.trace("Send %s to hotel" % u_msg.serialize())
                 try:
                     self.hotel.send(u_msg.serialize())
                 except ConnectionResetError:
-                    # TODO: maybe send a NACK to PBX here?
+                    try:
+                        self.pbx.send(NACK().serialize())
+                        self.logger.error("Sent NACK to PBX to force the CDR to be resent")
+                    except:
+                        self.logger.error("Failed sending NACK to PBX")
+                        pass
                     self.logger.error("Opera closed connection. Reseting all others")
                     return
                 d_msg = next(downstream_g)
