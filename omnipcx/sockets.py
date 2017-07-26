@@ -1,12 +1,11 @@
-import socket
-import time
+import socket, time, signal
 from omnipcx.logging import Loggable
 
 
 class Server(Loggable):
     def __init__(self, config):
         super(Server, self).__init__()
-        self.ipv6 = config['ipv6'] if socket.AF_INET6 else socket.AF_INET
+        self.ipv6 = socket.AF_INET6 if config['ipv6'] else socket.AF_INET
         self.opera_port = config['opera_port']
         self.old_port = config['old_port']
         self.cdr_port = config['cdr_port']
