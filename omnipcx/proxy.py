@@ -28,7 +28,7 @@ class Proxy(Loggable):
             # Try to read from PBX
             u_msg = next(upstream_g)
             if u_msg:
-                cdr_send_success = False
+                cdr_send_success = True
                 time_last_recv["upstream"] = time.time()
                 self.logger.trace("Recv %s from pbx" % u_msg.serialize())
                 if isinstance(u_msg, SMDR):
