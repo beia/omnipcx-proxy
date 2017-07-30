@@ -80,9 +80,7 @@ class Application(Loggable):
         lgr.addHandler(handler)
         lgr.setLevel(level)
         lgr.propagate = False
-        logger = LogWrapper(lgr)
-        for cls in [Server, MessageDetector, Proxy, MessageBase, Application]:
-            cls.set_logger(logger)
+        Loggable.set_logger(logger=LogWrapper(lgr))
         self.logger.info("Initialized logging")
 
     def start(self):
