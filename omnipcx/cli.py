@@ -19,6 +19,7 @@ DEFAULT_FORMAT = '{"timestamp": %(timestamp)s, "file": "%(file)s", "line_no": "%
 class Application(Loggable):
     @staticmethod
     def log_levels(log_level):
+        from argparse import ArgumentTypeError
         log_level = log_level.upper()
         choices = {
                 "DEBUG": logging.DEBUG,
@@ -29,12 +30,11 @@ class Application(Loggable):
                 "CRITICAL": logging.CRITICAL,
                 "CRIT": logging.CRITICAL,
         }
+        choices_msg = 'LogLevels: use one of' + ', '.join([choice.lower() for choice in choices.keys()])
         try:
             return choices[log_level]
         except KeyError:
-            msg = ', '.join([choice.lower() for choice in choices.keys()])
-            msg = 'LogLevels: use one of {%s}'%msg
-            raise argparse.ArgumentTypeError(msg)
+            raise ArgumentTypeError(choices_msg)
 
     @staticmethod
     def parse_args():
