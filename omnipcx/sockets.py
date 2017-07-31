@@ -16,12 +16,25 @@ class Server(Loggable):
         self.retry_sleep = config['retry_sleep']
 
     def listen(self):
-        server = socket.socket(self.ipv6, socket.SOCK_STREAM)
-        address = "" # socket.gethostname()
+        bind_fail = False
+        try:
+            server = socket.socket(self.ipv6, socket.SOCK_STREAM)
+            address = "" # socket.gethostname()
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind((address, self.opera_port))
+            server.listen(10)
+        except OSError:
+            bind_fail = True
+        except Exception:
+            import sys, os, os.path
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            self.logger.trace("Exception %s in file %s, line %s" % (exc_type.__name__, fname, exc_tb.tb_lineno))
+            bind_fail = True
+        if bind_fail:
+            self.logger.error("Cannot listen on port %s. Maybe there is another process listening to that port?" % self.opera_port)
+            return
         self.logger.info("Listening on [%s]:%d ...", address, self.opera_port)
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind((address, self.opera_port))
-        server.listen(10)
         while True:
             self.logger.info("Waiting for client connection ...")
             try:
