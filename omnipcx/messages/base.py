@@ -39,10 +39,13 @@ class ProtocolMessage(MessageBase):
     STX = b'\x02'
     ETX = b'\x03'
 
-    def __init__(self, payload):
+    def __init__(self, payload, with_ends=True):
         # Not valid anymore
         # assert len(payload) == self.get_payload_size()
-        self.payload = payload[1:-1]
+        if with_ends:
+            self.payload = payload[1:-1]
+        else:
+            self.payload = payload
 
     @classmethod
     def crc(cls, string):

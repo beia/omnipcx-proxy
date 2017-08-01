@@ -6,6 +6,7 @@ from omnipcx.messages import MessageDetector, MessageBase
 from omnipcx.proxy import Proxy
 from omnipcx.logging import ColorStreamHandler, Loggable, LogWrapper
 from omnipcx.sockets import Server
+from omnipcx.cdr_buffer import CDRBuffer
 
 DEFAULT_OLD_PORT = 5010
 DEFAULT_OPERA_PORT = 2561
@@ -13,6 +14,7 @@ DEFAULT_CDR_PORT = 6666
 DEFAULT_PASSWORD = '8756'
 DEFAULT_RETRY_TIMEOUT = 2.0
 DEFAULT_RETRIES = 5
+DEFAULT_BUFFER_FILE = 'cdr_buffer.db'
 DEFAULT_FORMAT = '{"timestamp": %(timestamp)s, "file": "%(file)s", "line_no": "%(line_no)s", "function": "%(function)s", "message": "%(message)s"}'
 
 
@@ -54,11 +56,14 @@ class Application(Loggable):
         parser.add_argument('--ipv6', type=bool, dest='ipv6', help='Use IPv6')
         parser.add_argument('--default-password', dest='default_password', default=DEFAULT_PASSWORD,
             help='Default voice mail password')
+        parser.add_argument('--buffer-db-file', dest='buffer_db_file', default=DEFAULT_BUFFER_FILE,
+            help='Default CDR buffer database file')
         return parser.parse_args()
 
     def __init__(self):
         self.args = Application.parse_args()
         self.init_logging()
+        self.init_cdr_buffer()
         self.server = Server({
                 'ipv6': self.args.ipv6,
                 'opera_port': self.args.opera_port,
@@ -69,6 +74,10 @@ class Application(Loggable):
                 'retries': DEFAULT_RETRIES,
                 'retry_sleep': DEFAULT_RETRY_TIMEOUT,
             })
+
+    def init_cdr_buffer(self):
+        self.cdr_buffer = CDRBuffer(file=self.args.buffer_db_file)
+        self.cdr_buffer.load()
 
     def init_logging(self, level=logging.DEBUG):
         logging.basicConfig(level=level)
@@ -88,9 +97,10 @@ class Application(Loggable):
         self.logger.info("Starting application")
         for skt_old, skt_opera, skt_cdr in self.server.socket_tuples():
             self.logger.info("Received Opera connection. Starting proxy operation")
-            proxy = Proxy(skt_old, skt_opera, skt_cdr, self.args.default_password)
+            proxy = Proxy(skt_old, skt_opera, skt_cdr, self.args.default_password, self.cdr_buffer)
             try:
                 proxy.run()
             finally:
                 for skt in [skt_opera, skt_old, skt_cdr]:
                     skt.close()
+        self.cdr_buffer.save()
