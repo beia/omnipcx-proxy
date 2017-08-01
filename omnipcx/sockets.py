@@ -1,6 +1,34 @@
 import socket, time, signal
 from omnipcx.logging import Loggable
 
+class CDRSocketWrapper(Loggable):
+    def __init__(self, socket):
+        super(CDRSocketWrapper, self).__init__()
+        self._socket = socket
+
+    def send(self, message):
+        try:
+            self._socket.send(message.serialize_cdr())
+            return True
+        except:
+            self.logger.error("Failed sending CDR to collector")
+            return False
+
+class SocketWrapper(CDRSocketWrapper):
+    def send(self, message):
+        try:
+            self._socket.send(message.serialize())
+            return True
+        except:
+            self.logger.error("Failed sending message to socket")
+            return False
+
+    def recv(self, size):
+        try:
+            return self.socket.recv(size)
+        except SocketTimeout:
+            return b""
+
 
 class Server(Loggable):
     def __init__(self, config):
@@ -82,5 +110,5 @@ class Server(Loggable):
                     skt_cdr.close()
                 skt_opera.close()
                 continue
-            yield skt_old, skt_opera, skt_cdr
+            yield SocketWrapper(skt_old), SocketWrapper(skt_opera), CDRSocketWrapper(skt_cdr)
 
