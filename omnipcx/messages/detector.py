@@ -25,10 +25,7 @@ class MessageDetector(Loggable):
 
     def messages(self):
         while True:
-            try:
-                message = self.socket.recv(RECV_SIZE)
-            except SocketTimeout:
-                message = b""
+            message = self.socket.recv(RECV_SIZE)
             self.remainder += message
             if len(self.remainder) == 0:
                 yield None

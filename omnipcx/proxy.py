@@ -8,7 +8,7 @@ from omnipcx.messages.control import NACK
 MAX_TIME = 60.0
 
 class Proxy(Loggable):
-    def __init__(self, pbx, hotel, cdr, default_password):
+    def __init__(self, pbx, hotel, cdr, default_password, buf):
         super(Proxy, self).__init__()
         self.pbx = pbx
         self.hotel = hotel
@@ -16,6 +16,33 @@ class Proxy(Loggable):
         self.upstream = MessageDetector(self.pbx)
         self.downstream = MessageDetector(self.hotel)
         self.default_password = default_password
+        self.buffer = buf
+
+    def send_missing_cdr(self):
+        if self.buffer.is_empty:
+            return True
+        self.logger.info("Sending buffered CDRs")
+        count = 0
+        while True:
+            # TODO: try to do some kind of flow control ...
+            message = self.buffer.get()
+            if not self.cdr.send(message):
+                self.logger.error("CDR sending failed")
+                self.buffer.put(message)
+                return False
+            count += 1
+            if self.buffer.is_empty:
+                break
+        self.logger.info("Sent all CDRs to the collector")
+        return True
+
+    def send_nack_to_pbx(self, log_msg):
+        if not self.pbx.send(NACK()):
+            self.logger.error("Failed sending NACK to PBX")
+        else:
+            self.logger.info("Sent NACK to PBX to force the CDR to be resent")
+        if log_msg != "":
+            self.logger.error(log_msg)
 
     def run(self):
         time_last_recv =  {
@@ -24,49 +51,27 @@ class Proxy(Loggable):
         }
         upstream_g = self.upstream.messages()
         downstream_g = self.downstream.messages()
+        if not self.send_missing_cdr():
+            return
         while True:
             # Try to read from PBX
             u_msg = next(upstream_g)
             if u_msg:
-                cdr_send_success = True
                 time_last_recv["upstream"] = time.time()
                 self.logger.trace("Recv %s from pbx" % u_msg.serialize())
                 if isinstance(u_msg, SMDR):
-                    try:
-                        self.cdr.send(u_msg.serialize_cdr())
-                    except ConnectionResetError:
-                        cdr_send_success = False
-                if not cdr_send_success:
-                    try:
-                        self.pbx.send(NACK().serialize())
-                        self.logger.error("Sent NACK to PBX to force the CDR to be resent")
-                    except:
-                        self.logger.error("Failed sending NACK to PBX")
-                        pass
-                    self.logger.error("CDR collector closed connection. Reseting all others")
-                    return
+                    if not self.cdr.send(u_msg):
+                        self.buffer.add(u_msg)
+                        return self.send_nack_to_pbx(log_msg="CDR collector closed connection. Reseting all others")
                 self.logger.trace("Send %s to hotel" % u_msg.serialize())
-                try:
-                    self.hotel.send(u_msg.serialize())
-                except ConnectionResetError:
-                    try:
-                        self.pbx.send(NACK().serialize())
-                        self.logger.error("Sent NACK to PBX to force the CDR to be resent")
-                    except:
-                        self.logger.error("Failed sending NACK to PBX")
-                        pass
-                    self.logger.error("Opera closed connection. Reseting all others")
-                    return
+                if not self.hotel.send(u_msg):
+                    return self.send_nack_to_pbx(log_msg="Opera closed connection. Reseting all others")
                 d_msg = next(downstream_g)
                 if not d_msg:
-                    self.logger.error("Timeout when waiting for message from Opera")
-                    return
+                    return self.logger.error("Timeout when waiting for message from Opera")
                 time_last_recv["downstream"] = time.time()
-                try:
-                    self.pbx.send(d_msg.serialize())
-                except ConnectionResetError:
-                    self.logger.error("PBX closed connection. Reseting all others")
-                    return
+                if not self.pbx.send(d_msg):
+                    return self.logger.error("PBX closed connection. Reseting all others")
             # Try to read from Hotel
             d_msg = next(downstream_g)
             if d_msg:
@@ -76,21 +81,13 @@ class Proxy(Loggable):
                     if d_msg.password == b"    ":
                         d_msg.password = self.default_password
                 self.logger.trace("Send %s to pbx" % d_msg.serialize())
-                try:
-                    self.pbx.send(d_msg.serialize())
-                except ConnectionResetError:
-                    self.logger.error("PBX closed connection. Reseting all others")
-                    return
+                if not self.pbx.send(d_msg):
+                    return self.logger.error("PBX closed connection. Reseting all others")
                 u_msg = next(upstream_g)
                 if not u_msg:
-                    self.logger.error("Timeout when waiting for message from OLD/Hotel Driver")
-                    return
+                    return self.logger.error("Timeout when waiting for message from OLD/Hotel Driver")
                 time_last_recv["upstream"] = time.time()
-                try:
-                    self.hotel.send(u_msg.serialize())
-                except:
-                    self.logger.error("Opera closed connection. Reseting all others")
-                    return
+                if not self.hotel.send(u_msg):
+                    return self.logger.error("Opera closed connection. Reseting all others")
             if time.time() - max(time_last_recv.values()) > MAX_TIME:
-                self.logger.warn("The connections were innactive for too long. We are probably disconnected ...")
-                return
+                return self.logger.warn("The connections were innactive for too long. We are probably disconnected ...")
