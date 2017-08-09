@@ -4,6 +4,7 @@ from omnipcx.logging import Loggable
 class CDRSocketWrapper(Loggable):
     def __init__(self, socket):
         super(CDRSocketWrapper, self).__init__()
+        self.open = True
         self._socket = socket
 
     def send(self, message):
@@ -28,6 +29,13 @@ class SocketWrapper(CDRSocketWrapper):
             return self.socket.recv(size)
         except SocketTimeout:
             return b""
+
+    def close(self):
+        if not self.open:
+            self.logger.warn("Trying to close a closed socket")
+            return
+        self.open = False
+        self.close()
 
 
 class Server(Loggable):

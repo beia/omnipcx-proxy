@@ -93,7 +93,6 @@ class Application(Loggable):
         self.logger.info("Initialized logging")
 
     def start(self):
-        args = self.parse_args()
         self.logger.info("Starting application")
         for skt_old, skt_opera, skt_cdr in self.server.socket_tuples():
             self.logger.info("Received Opera connection. Starting proxy operation")
