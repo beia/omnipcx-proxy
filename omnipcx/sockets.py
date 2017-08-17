@@ -62,10 +62,7 @@ class Server(Loggable):
         except OSError:
             bind_fail = True
         except Exception:
-            import sys, os, os.path
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            self.logger.trace("Exception %s in file %s, line %s" % (exc_type.__name__, fname, exc_tb.tb_lineno))
+            self.logger.exception("Caught exception when listening for connections")
             bind_fail = True
         if bind_fail:
             self.logger.error("Cannot listen on port %s. Maybe there is another process listening to that port?" % self.opera_port)

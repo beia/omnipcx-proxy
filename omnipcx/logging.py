@@ -143,6 +143,13 @@ class LogWrapper(object):
     def error(self, message, *args):
         self._logger.error(message, *args, extra=self._logging_extra)
 
+    def exception(self, message, *args):
+        import sys, os, os.path
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        self.error(message)
+        self.error("Exception %s in file %s, line %s" % (exc_type.__name__, fname, exc_tb.tb_lineno))
+
 
 class Loggable(object):
     @property
