@@ -61,7 +61,7 @@ class Proxy(Loggable):
                 self.logger.trace("Recv %s from pbx" % u_msg.serialize())
                 if isinstance(u_msg, SMDR):
                     if not self.cdr.send(u_msg):
-                        self.buffer.add(u_msg)
+                        self.buffer.put(u_msg)
                         return self.send_nack_to_pbx(log_msg="CDR collector closed connection. Reseting all others")
                 self.logger.trace("Send %s to hotel" % u_msg.serialize())
                 if not self.hotel.send(u_msg):
