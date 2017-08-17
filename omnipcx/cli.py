@@ -99,6 +99,11 @@ class Application(Loggable):
             proxy = Proxy(skt_old, skt_opera, skt_cdr, self.args.default_password, self.cdr_buffer)
             try:
                 proxy.run()
+            except KeyboardInterrupt:
+                self.logger.warn("Stopped by Control+C")
+                break
+            except Exception:
+                self.logger.exception("Caught an exception in the main loop of the proxy")
             finally:
                 for skt in [skt_opera, skt_old, skt_cdr]:
                     skt.close()
