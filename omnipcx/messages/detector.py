@@ -1,4 +1,3 @@
-from socket import timeout as SocketTimeout
 from omnipcx.logging import Loggable
 from omnipcx.messages.control import CLASSES as _CONTROL_MSG_CLS
 from omnipcx.messages.protocol import CLASSES as _PROTOCOL_MSG_CLS
