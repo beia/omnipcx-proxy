@@ -1,41 +1,45 @@
 import socket, time, signal
 from omnipcx.logging import Loggable
 
-class CDRSocketWrapper(Loggable):
+class SocketWrapper(Loggable):
     def __init__(self, socket):
-        super(CDRSocketWrapper, self).__init__()
-        self.open = True
+        super(SocketWrapper, self).__init__()
+        self._open = True
         self._socket = socket
 
     def send(self, message):
         try:
-            self._socket.send(message.serialize_cdr())
-            return True
-        except:
-            self.logger.error("Failed sending CDR to collector")
-            return False
-
-class SocketWrapper(CDRSocketWrapper):
-    def send(self, message):
-        try:
             self._socket.send(message.serialize())
             return True
-        except:
-            self.logger.error("Failed sending message to socket")
+        except BrokenPipeError:
+            self.logger.error("Remote end closed connection")
             return False
 
     def recv(self, size):
         try:
-            return self.socket.recv(size)
-        except SocketTimeout:
+            return self._socket.recv(size)
+        except socket.timeout:
             return b""
 
     def close(self):
-        if not self.open:
+        if not self._open:
             self.logger.warn("Trying to close a closed socket")
             return
-        self.open = False
-        self.close()
+        self._open = False
+        self._socket.close()
+
+
+class CDRSocketWrapper(SocketWrapper):
+    def send(self, message):
+        try:
+            self._socket.send(message.serialize_cdr())
+            return True
+        except BrokenPipeError:
+            self.logger.error("Remote end closed connection")
+            return False
+        except:
+            self.logger.exception("Failed sending CDR to collector")
+            return False
 
 
 class Server(Loggable):
