@@ -1,10 +1,10 @@
-import socket, time, signal
+import socket, signal, os.path, os
 from omnipcx.logging import Loggable
 
 
 class ClientStream(Loggable):
     def __init__(self, address, port, timeout=0.5, ipv6=False):
-        self(ClientStream, self).__init__()
+        super(ClientStream, self).__init__()
         self.port = port
         self.address = address
         self.ipv6 = socket.AF_INET6 if ipv6 else socket.AF_INET
@@ -22,8 +22,8 @@ class ClientStream(Loggable):
         try:
             skt = socket.socket(self.ipv6, socket.SOCK_STREAM)
             skt.settimeout(self.timeout)
-            self.logger.info("Trying to open a connection to %s:%s" %(address, port))
-            skt.connect((address, port),)
+            self.logger.info("Trying to open a connection to %s:%s" %(self.address, self.port))
+            skt.connect((self.address, self.port),)
             self._socket = skt
             self._connected = True
         except (socket.timeout, ConnectionRefusedError) as e:
@@ -59,12 +59,15 @@ class ClientStream(Loggable):
         self._socket.close()
 
 
-class CDRClientStream(ClientStream):
+class CDRStream(ClientStream):
     def __init__(self, address, port, filename=None, timeout=0.5, ipv6=False):
-        self(CDRClientStream, self).__init__(address, port, timeout, ipv6)
+        super(CDRStream, self).__init__(address, port, timeout, ipv6)
         self.cdr_file = filename
         if self.cdr_file:
             self._connected = True
+        else:
+            if address is None or port is None:
+                raise Exception("You need to specify an address and a port")
 
     @property
     def temp_file(self):
@@ -74,14 +77,14 @@ class CDRClientStream(ClientStream):
         if self.cdr_file:
             return True
         else:
-            return super(CDRClientStream, self).connect()
+            return super(CDRStream, self).connect()
 
     def recv(self):
         self.logger.warn("Cannot read from a CDR socket")
         if self.cdr_file:
             return b""
         else:
-            return super(CDRClientStream, self).recv()
+            return super(CDRStream, self).recv()
 
     def send(self, message):
         if not self._connected:
@@ -91,10 +94,14 @@ class CDRClientStream(ClientStream):
             # File case
             try:
                 with open(self.temp_file, "a+") as f:
-                    f.write(message.serialize_cdr())
+                    # TODO: should it be ASCII?
+                    f.write(message.serialize_cdr().decode("utf-8", "strict"))
                 return True
+            except PermissionError:
+                self.logger.error("Failed writing CDR to file '%s': permission denied" % self.temp_file)
+                return False
             except Exception as e:
-                self.logger.exception("Failed writing CDR to file: " + e)
+                self.logger.exception("Failed writing CDR to file: " + str(e))
                 return False
         else:
             # Network case
@@ -108,22 +115,32 @@ class CDRClientStream(ClientStream):
                 self.logger.exception("Failed sending CDR to collector")
                 return False
 
+    def close(self):
+        if not self.cdr_file:
+            super(CDRStream, self).close()
+
+
     def rotate(self):
         if not self.cdr_file:
             return
-        if not os.path.isfile(self.cdr_file):
-            self.logger.info("Moving CDR file to its place")
-            os.replace(self.temp_file, self.cdr_file)
-        else:
-            self.logger.info("CDR collecter didn't gather CDRs. Not replacing CDR file yet")
+        try:
+            can_replace = not os.path.isfile(self.cdr_file)
+            if can_replace:
+                self.logger.info("Moving CDR file to its place")
+                os.replace(self.temp_file, self.cdr_file)
+            else:
+                self.logger.info("CDR collecter didn't gather CDRs. Not replacing CDR file yet")
+        except PermissionError as e:
+            self.logger.exception(("Cannot rename CDR temp file %s to CDR file %s: " % (self.temp_file, self.cdr_file) )+ str(e))
+            raise e
 
 
 class ServerStream(Loggable):
     class SocketWrapper(Loggable):
-        def __init__(self, socket):
-            super(SocketWrapper, self).__init__()
+        def __init__(self, skt):
+            super(ServerStream.SocketWrapper, self).__init__()
             self._connected = True
-            self._socket = socket
+            self._socket = skt
 
         def send(self, message):
             try:
@@ -147,7 +164,7 @@ class ServerStream(Loggable):
             self._socket.close()
 
     def __init__(self, port, timeout=0.5, ipv6=False, parallel_num=10):
-        self(ServerStream, self).__init__()
+        super(ServerStream, self).__init__()
         self.port = port
         self.ipv6 = socket.AF_INET6 if ipv6 else socket.AF_INET
         self.timeout = timeout
@@ -156,7 +173,7 @@ class ServerStream(Loggable):
 
     @property
     def listening(self):
-        retrun self._listening
+        return self._listening
 
     def listen(self):
         bind_fail = False
@@ -179,9 +196,9 @@ class ServerStream(Loggable):
         while True:
             self.logger.info("Waiting for client connection ...")
             try:
-                socket, address = server.accept()
-                socket.settimeout(self.timeout)
-                yield SocketWrapper(socket)
+                skt, address = server.accept()
+                skt.settimeout(self.timeout)
+                yield ServerStream.SocketWrapper(skt)
             except KeyboardInterrupt:
                 self.logger.warn("Stopped by Control+C")
                 return

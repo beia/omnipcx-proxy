@@ -91,3 +91,5 @@ class Proxy(Loggable):
                     return self.logger.error("Opera closed connection. Reseting all others")
             if time.time() - max(time_last_recv.values()) > MAX_TIME:
                 return self.logger.warn("The connections were innactive for too long. We are probably disconnected ...")
+            # rotate the CDR file
+            self.cdr.rotate()

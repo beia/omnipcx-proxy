@@ -1,11 +1,8 @@
-import argparse
-import logging
-import sys
-import traceback
+import argparse, logging, sys, traceback, time
 from omnipcx.messages import MessageDetector, MessageBase
 from omnipcx.proxy import Proxy
 from omnipcx.logging import ColorStreamHandler, Loggable, LogWrapper
-from omnipcx.streams import CDRClientStream, ClientStream, ServerStream
+from omnipcx.streams import CDRStream, ClientStream, ServerStream
 from omnipcx.cdr_buffer import CDRBuffer
 
 DEFAULT_OLD_PORT = 5010
@@ -52,13 +49,15 @@ class Application(Loggable):
             help='Save CDRs to a file instead of sending them over the network. If set, other CDR settings are ignored.')
         parser.add_argument('--cdr-port', type=int, dest='cdr_port', default=DEFAULT_CDR_PORT,
             help='CDR collection port (connect)')
-        parser.add_argument('--cdr-address', dest='cdr_address', required=True,
+        parser.add_argument('--cdr-address', dest='cdr_address',
             help='CDR collection address (connect)')
         parser.add_argument('--cdr-buffer-db-file', dest='buffer_db_file', default=DEFAULT_BUFFER_FILE,
             help='Default CDR buffer database file')
         parser.add_argument('--ipv6', type=bool, dest='ipv6', help='Use IPv6')
         parser.add_argument('--default-password', dest='default_password', default=DEFAULT_PASSWORD,
             help='Default voice mail password')
+        parser.add_argument('--retry-sleep', dest='retry_sleep', default=5,
+            help='Default sleep between connection attempts')
         self.args = parser.parse_args()
 
     def __init__(self):
@@ -85,7 +84,7 @@ class Application(Loggable):
 
     def socket_tuples(self):
         opera_listener = ServerStream(self.args.opera_port, ipv6=self.args.ipv6)
-        cdr_stream = CDRStream(self.args.cdr_address, self.args.cdr_port, self.args.cdr_file, ipv6=self.args.ipv6)
+        cdr_stream = CDRStream(self.args.cdr_address, self.args.cdr_port, self.args.cdr_file_name, ipv6=self.args.ipv6)
         old_stream = ClientStream(self.args.old_address, self.args.old_port, ipv6=self.args.ipv6)
         for opera_stream in opera_listener.listen():
             retries = DEFAULT_RETRIES
@@ -100,12 +99,12 @@ class Application(Loggable):
                 if not old_connected:
                     retries -= 1
                     self.logger.warn("Couldn't open connection to OLD. Waiting ...")
-                    time.sleep(self.retry_sleep)
+                    time.sleep(self.args.retry_sleep)
                     continue
                 elif not cdr_connected:
                     retries -= 1
                     self.logger.warn("Couldn't open connection to CDR. Waiting ...")
-                    time.sleep(self.retry_sleep)
+                    time.sleep(self.args.retry_sleep)
                     continue
                 else:
                     break
@@ -135,6 +134,7 @@ class Application(Loggable):
                 break
             except Exception:
                 self.logger.exception("Caught an exception in the main loop of the proxy")
+                traceback.print_exc()
             finally:
                 for stream in [opera_stream, old_stream, cdr_stream]:
                     stream.close()
