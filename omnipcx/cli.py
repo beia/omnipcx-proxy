@@ -60,6 +60,8 @@ class Application(Loggable):
         parser.add_argument('--retry-sleep', dest='retry_sleep', default=5,
             help='Default sleep between connection attempts')
         self.args = parser.parse_args()
+        if not self.args.cdr_file_name and (not self.args.cdr_port or not self.args.cdr_address):
+            parser.error("Either specify --cdr-file or both --cdr-address and --cdr-port")
 
     def __init__(self):
         self.parse_args()
