@@ -5,7 +5,7 @@ import traceback
 from omnipcx.messages import MessageDetector, MessageBase
 from omnipcx.proxy import Proxy
 from omnipcx.logging import ColorStreamHandler, Loggable, LogWrapper
-from omnipcx.sockets import Server
+from omnipcx.streams import CDRClientStream, ClientStream, ServerStream
 from omnipcx.cdr_buffer import CDRBuffer
 
 DEFAULT_OLD_PORT = 5010
@@ -38,8 +38,7 @@ class Application(Loggable):
         except KeyError:
             raise ArgumentTypeError(choices_msg)
 
-    @staticmethod
-    def parse_args():
+    def parse_args(self):
         parser = argparse.ArgumentParser(prog="proxy", description='Proxy between OLD and Opera')
         parser.add_argument("--log-level", type=Application.log_levels, default="INFO",
             help="Log level", dest="log_level")
@@ -49,31 +48,23 @@ class Application(Loggable):
             help='Office Link Driver address (connect)')
         parser.add_argument('--opera-port', type=int, dest='opera_port', default=DEFAULT_OPERA_PORT,
             help='Opera port (listen)')
+        parser.add_argument('--cdr-file', type=str, dest='cdr_file_name', default=None,
+            help='Save CDRs to a file instead of sending them over the network. If set, other CDR settings are ignored.')
         parser.add_argument('--cdr-port', type=int, dest='cdr_port', default=DEFAULT_CDR_PORT,
             help='CDR collection port (connect)')
         parser.add_argument('--cdr-address', dest='cdr_address', required=True,
             help='CDR collection address (connect)')
+        parser.add_argument('--cdr-buffer-db-file', dest='buffer_db_file', default=DEFAULT_BUFFER_FILE,
+            help='Default CDR buffer database file')
         parser.add_argument('--ipv6', type=bool, dest='ipv6', help='Use IPv6')
         parser.add_argument('--default-password', dest='default_password', default=DEFAULT_PASSWORD,
             help='Default voice mail password')
-        parser.add_argument('--buffer-db-file', dest='buffer_db_file', default=DEFAULT_BUFFER_FILE,
-            help='Default CDR buffer database file')
-        return parser.parse_args()
+        self.args = parser.parse_args()
 
     def __init__(self):
-        self.args = Application.parse_args()
+        self.parse_args()
         self.init_logging()
         self.init_cdr_buffer()
-        self.server = Server({
-                'ipv6': self.args.ipv6,
-                'opera_port': self.args.opera_port,
-                'old_port': self.args.old_port,
-                'old_address': self.args.old_address,
-                'cdr_port': self.args.cdr_port,
-                'cdr_address': self.args.cdr_address,
-                'retries': DEFAULT_RETRIES,
-                'retry_sleep': DEFAULT_RETRY_TIMEOUT,
-            })
 
     def init_cdr_buffer(self):
         self.cdr_buffer = CDRBuffer(file=self.args.buffer_db_file)
@@ -92,19 +83,59 @@ class Application(Loggable):
         Loggable.set_logger(logger=LogWrapper(lgr))
         self.logger.info("Initialized logging")
 
+    def socket_tuples(self):
+        opera_listener = ServerStream(self.args.opera_port, ipv6=self.args.ipv6)
+        cdr_stream = CDRStream(self.args.cdr_address, self.args.cdr_port, self.args.cdr_file, ipv6=self.args.ipv6)
+        old_stream = ClientStream(self.args.old_address, self.args.old_port, ipv6=self.args.ipv6)
+        for opera_stream in opera_listener.listen():
+            retries = DEFAULT_RETRIES
+            old_connected = False
+            cdr_connected = False
+            while retries > 0:
+                if not cdr_connected:
+                    cdr_connected = cdr_stream.connect()
+                if not old_connected:
+                    old_connected = old_stream.connect()
+
+                if not old_connected:
+                    retries -= 1
+                    self.logger.warn("Couldn't open connection to OLD. Waiting ...")
+                    time.sleep(self.retry_sleep)
+                    continue
+                elif not cdr_connected:
+                    retries -= 1
+                    self.logger.warn("Couldn't open connection to CDR. Waiting ...")
+                    time.sleep(self.retry_sleep)
+                    continue
+                else:
+                    break
+            if not old_connected or not cdr_connected:
+                if old_connected:
+                    self.logger.trace("Closing connection to Opera")
+                    self.logger.error("Couldn't connect to CDR collector. Giving up.")
+                    old_stream.close()
+                if cdr_connected:
+                    self.logger.trace("Closing connection to CDR collector")
+                    self.logger.error("Couldn't connect to OLD. Giving up.")
+                    cdr_stream.close()
+                opera_stream.close()
+                continue
+            yield old_stream, opera_stream, cdr_stream
+
+
     def start(self):
         self.logger.info("Starting application")
-        for skt_old, skt_opera, skt_cdr in self.server.socket_tuples():
+        for old_stream, opera_stream, cdr_stream in self.socket_tuples():
             self.logger.info("Received Opera connection. Starting proxy operation")
-            proxy = Proxy(skt_old, skt_opera, skt_cdr, self.args.default_password, self.cdr_buffer)
+            proxy = Proxy(old_stream, opera_stream, cdr_stream, self.args.default_password, self.cdr_buffer)
             try:
                 proxy.run()
             except KeyboardInterrupt:
-                self.logger.warn("Stopped by Control+C")
+                self.logger.warn("Stopped by Ctrl+C / Ctrl+Break")
                 break
             except Exception:
                 self.logger.exception("Caught an exception in the main loop of the proxy")
             finally:
-                for skt in [skt_opera, skt_old, skt_cdr]:
-                    skt.close()
+                for stream in [opera_stream, old_stream, cdr_stream]:
+                    stream.close()
         self.cdr_buffer.save()
