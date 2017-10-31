@@ -99,7 +99,9 @@ class CDRStream(ClientStream):
             return super(CDRStream, self).recv()
 
     def create_dir_for_file(self, filename):
-        directory = os.path.dirname(filename)
+        directory = os.path.abspath(os.path.dirname(filename))
+        if directory == os.getcwd():
+            return True
         try:
             os.makedirs(directory)
             return True
@@ -152,7 +154,7 @@ class CDRStream(ClientStream):
                 self.logger.info("Moving CDR file to its place")
                 os.replace(self.temp_file, self.cdr_file)
             else:
-                self.logger.info("CDR collecter didn't gather CDRs. Not replacing CDR file yet")
+                self.logger.debug("CDR collecter didn't gather CDRs. Not replacing CDR file yet")
         except PermissionError as e:
             self.logger.exception(("Cannot rename CDR temp file %s to CDR file %s: " % (self.temp_file, self.cdr_file) )+ str(e))
             raise e
@@ -206,6 +208,7 @@ class ServerStream(Loggable):
             address = "" # socket.gethostname()
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server.settimeout(self.listen_timeout)
+            self.show_waiting_message = True
             server.bind((address, self.port))
             self._listening = True
             server.listen(self.parallel_num)
@@ -219,11 +222,14 @@ class ServerStream(Loggable):
             return
         self.logger.info("Listening on [%s]:%d ...", address, self.port)
         while True:
-            self.logger.info("Waiting for client connection ...")
+            if not self.listen_timeout and self.show_waiting_message:
+                self.logger.info("Waiting for client connection ...")
+                self.waiting_message = False
             try:
                 skt, address = server.accept()
                 skt.settimeout(self.timeout)
                 yield ServerStream.SocketWrapper(skt)
+                self.show_waiting_message = True
             except KeyboardInterrupt:
                 self.logger.warn("Stopped by Control+C")
                 return
