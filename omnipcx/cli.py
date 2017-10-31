@@ -10,6 +10,7 @@ DEFAULT_OPERA_PORT = 2561
 DEFAULT_CDR_PORT = 6666
 DEFAULT_PASSWORD = '8756'
 DEFAULT_RETRY_TIMEOUT = 2.0
+DEFAULT_LISTEN_TIMEOUT = 5.0
 DEFAULT_RETRIES = 5
 DEFAULT_BUFFER_FILE = 'cdr_buffer.db'
 DEFAULT_FORMAT = '{"timestamp": %(timestamp)s, "file": "%(file)s", "line_no": "%(line_no)s", "function": "%(function)s", "message": "%(message)s"}'
@@ -83,10 +84,14 @@ class Application(Loggable):
         self.logger.info("Initialized logging")
 
     def socket_tuples(self):
-        opera_listener = ServerStream(self.args.opera_port, ipv6=self.args.ipv6)
+        opera_listener = ServerStream(self.args.opera_port, listen_timeout=DEFAULT_LISTEN_TIMEOUT, ipv6=self.args.ipv6)
         cdr_stream = CDRStream(self.args.cdr_address, self.args.cdr_port, self.args.cdr_file_name, ipv6=self.args.ipv6)
         old_stream = ClientStream(self.args.old_address, self.args.old_port, ipv6=self.args.ipv6)
         for opera_stream in opera_listener.listen():
+            if opera_stream is None:
+                # This was a timeout, so let's just rotate the CDR file, and continue
+                cdr_stream.rotate()
+                continue
             retries = DEFAULT_RETRIES
             old_connected = False
             cdr_connected = False

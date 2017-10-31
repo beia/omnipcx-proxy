@@ -186,11 +186,12 @@ class ServerStream(Loggable):
             self._connected = False
             self._socket.close()
 
-    def __init__(self, port, timeout=0.5, ipv6=False, parallel_num=10):
+    def __init__(self, port, listen_timeout=5, timeout=0.5, ipv6=False, parallel_num=10):
         super(ServerStream, self).__init__()
         self.port = port
         self.ipv6 = socket.AF_INET6 if ipv6 else socket.AF_INET
         self.timeout = timeout
+        self.listen_timeout = listen_timeout
         self.parallel_num = parallel_num
         self._listening = False
 
@@ -204,6 +205,7 @@ class ServerStream(Loggable):
             server = socket.socket(self.ipv6, socket.SOCK_STREAM)
             address = "" # socket.gethostname()
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.settimeout(self.listen_timeout)
             server.bind((address, self.port))
             self._listening = True
             server.listen(self.parallel_num)
@@ -225,3 +227,5 @@ class ServerStream(Loggable):
             except KeyboardInterrupt:
                 self.logger.warn("Stopped by Control+C")
                 return
+            except socket.timeout:
+                yield None
