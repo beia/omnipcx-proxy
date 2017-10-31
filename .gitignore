@@ -3,3 +3,4 @@
 *cov*
 env
 *.db
+*.egg-info/
