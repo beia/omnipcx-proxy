@@ -125,7 +125,7 @@ class CDRStream(ClientStream):
             return
         try:
             can_replace = not os.path.isfile(self.cdr_file)
-            if can_replace:
+            if can_replace and os.path.isfile(self.temp_file):
                 self.logger.info("Moving CDR file to its place")
                 os.replace(self.temp_file, self.cdr_file)
             else:
