@@ -1,4 +1,4 @@
-import socket, signal, os.path, os
+import socket, signal, os.path, os, errno
 from omnipcx.logging import Loggable
 
 
@@ -62,16 +62,28 @@ class ClientStream(Loggable):
 class CDRStream(ClientStream):
     def __init__(self, address, port, filename=None, timeout=0.5, ipv6=False):
         super(CDRStream, self).__init__(address, port, timeout, ipv6)
-        self.cdr_file = filename
-        if self.cdr_file:
+        self._filename = filename
+        if self.file_mode:
             self._connected = True
+            was_present = self.create_dir_for_file(self._filename)
+            if not was_present:
+                self.logger.warn("Created folder for CDR file")
         else:
             if address is None or port is None:
                 raise Exception("You need to specify an address and a port")
 
     @property
+    def file_mode(self):
+        """ The stream works in file mode"""
+        return self._filename is not None
+
+    @property
     def temp_file(self):
-        return self.cdr_file + ".1"
+        return self._filename
+
+    @property
+    def cdr_file(self):
+        return self._filename + ".1"
 
     def connect(self):
         if self.cdr_file:
@@ -86,11 +98,22 @@ class CDRStream(ClientStream):
         else:
             return super(CDRStream, self).recv()
 
+    def create_dir_for_file(self, filename):
+        directory = os.path.dirname(filename)
+        try:
+            os.makedirs(directory)
+            return True
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+            else:
+                return False
+
     def send(self, message):
         if not self._connected:
             self.logger.error("Cannot send to a closed socket")
             return
-        if self.cdr_file:
+        if self.file_mode:
             # File case
             try:
                 with open(self.temp_file, "a+") as f:
@@ -116,12 +139,12 @@ class CDRStream(ClientStream):
                 return False
 
     def close(self):
-        if not self.cdr_file:
+        if not self.file_mode:
             super(CDRStream, self).close()
 
 
     def rotate(self):
-        if not self.cdr_file:
+        if not self.file_mode:
             return
         try:
             can_replace = not os.path.isfile(self.cdr_file) and os.path.isfile(self.temp_file)
